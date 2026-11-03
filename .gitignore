@@ -1,0 +1,17 @@
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+
+# datasets and weights are not tracked
+*.pt
+*.zip
+dataset/
+runs/
