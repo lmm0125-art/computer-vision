@@ -39,7 +39,11 @@ class Linear(object):
         # You will need to reshape the input into rows.                      #
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        torch.set_default_dtype(torch.float64)
+        N = x.shape[0]
+        D = w.shape[0]
+        x_reshaped = x.reshape(N, D)
+        out = x_reshaped @ w + b 
         ######################################################################
         #                        END OF YOUR CODE                            #
         ######################################################################
@@ -68,7 +72,11 @@ class Linear(object):
         # TODO: Implement the linear backward pass.      #
         ##################################################
         # Replace "pass" statement with your code
-        pass
+        N = x.shape[0]
+        D = w.shape[0]
+        dx = (dout @ w.T).reshape(x.shape)
+        dw = x.reshape(N, D).T @ dout    
+        db = dout.sum(dim=0)
         ##################################################
         #                END OF YOUR CODE                #
         ##################################################
@@ -95,7 +103,7 @@ class ReLU(object):
         # in-place operation.                             #
         ###################################################
         # Replace "pass" statement with your code
-        pass
+        out = torch.clamp(x, min=0)
         ###################################################
         #                 END OF YOUR CODE                #
         ###################################################
@@ -120,7 +128,7 @@ class ReLU(object):
         # in-place operation.                               #
         #####################################################
         # Replace "pass" statement with your code
-        pass
+        dx = dout * (x > 0)
         #####################################################
         #                  END OF YOUR CODE                 #
         #####################################################
@@ -202,7 +210,10 @@ class TwoLayerNet(object):
         # weights and biases using the keys 'W2' and 'b2'.                #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        self.params['W1'] = torch.randn(input_dim, hidden_dim, dtype=dtype, device=device) * weight_scale
+        self.params['b1'] = torch.zeros(hidden_dim, dtype=dtype, device=device)
+        self.params['W2'] = torch.randn(hidden_dim, num_classes, dtype=dtype, device=device) * weight_scale
+        self.params['b2'] = torch.zeros(num_classes, dtype=dtype, device=device)
         ###############################################################
         #                            END OF YOUR CODE                 #
         ###############################################################
@@ -253,7 +264,11 @@ class TwoLayerNet(object):
         # scores variable.                                          #
         #############################################################
         # Replace "pass" statement with your code
-        pass
+        W1, b1 = self.params['W1'], self.params['b1']
+        W2, b2 = self.params['W2'], self.params['b2']
+        z1 = X.reshape(X.shape[0], -1) @ W1 + b1
+        a1 = torch.clamp(z1, min=0)
+        scores = a1 @ W2 + b2  
         ##############################################################
         #                     END OF YOUR CODE                       #
         ##############################################################
@@ -275,7 +290,21 @@ class TwoLayerNet(object):
         # regularization does not include a factor of 0.5.                #
         ###################################################################
         # Replace "pass" statement with your code
-        pass
+        N = scores.shape[0]
+        exp = torch.exp(scores - scores.max(dim=1, keepdim=True)[0])
+        prob = exp / exp.sum(dim=1, keepdim=True)
+        loss = -torch.log(prob[torch.arange(N), y]).mean()
+        l2_reg = (W1**2).sum() + (W2**2).sum()
+        loss += self.reg * l2_reg
+        dscores = prob.clone()
+        dscores[torch.arange(N), y] -= 1
+        dscores /= N
+        grads['W2'] = a1.T @ dscores + 2 * self.reg * W2
+        grads['b2'] = dscores.sum(dim=0)
+        da1 = dscores @ W2.T
+        dz1 = da1 * (z1 > 0).float()
+        grads['W1'] = X.reshape(X.shape[0], -1).T @ dz1 + 2 * self.reg * W1
+        grads['b1'] = dz1.sum(dim=0)
         ###################################################################
         #                     END OF YOUR CODE                            #
         ###################################################################
@@ -337,7 +366,10 @@ class FullyConnectedNet(object):
         # should be initialized to zero.                                      #
         #######################################################################
         # Replace "pass" statement with your code
-        pass
+        dims = [input_dim] + hidden_dims + [num_classes]
+        for i in range(self.num_layers):
+            self.params[f'W{i+1}'] = torch.randn(dims[i], dims[i+1], dtype=dtype, device=device) * weight_scale
+            self.params[f'b{i+1}'] = torch.zeros(dims[i+1], dtype=dtype, device=device)
         #######################################################################
         #                         END OF YOUR CODE                            #
         #######################################################################
@@ -401,7 +433,25 @@ class FullyConnectedNet(object):
         # to each dropout forward pass.                                  #
         ##################################################################
         # Replace "pass" statement with your code
-        pass
+        layer_out = X.reshape(X.shape[0], -1)  
+        caches = []                 
+        if self.use_dropout:
+            dropout_caches = []
+        for i in range(1, self.num_layers):
+            W, b = self.params[f'W{i}'], self.params[f'b{i}']
+            z = layer_out @ W + b
+            a = torch.clamp(z, min=0)     
+            if self.use_dropout:
+                mask = (torch.rand_like(a) > self.dropout_param['p']) / (1.0 - self.dropout_param['p'])
+                if mode == 'train':
+                    a *= mask
+                caches.append((layer_out, W, b, z, mask))
+            else:
+                caches.append((layer_out, W, b, z))
+            layer_out = a
+        W_last = self.params[f'W{self.num_layers}']
+        b_last = self.params[f'b{self.num_layers}']
+        scores = layer_out @ W_last + b_last
         #################################################################
         #                      END OF YOUR CODE                         #
         #################################################################
@@ -423,7 +473,35 @@ class FullyConnectedNet(object):
         # the gradient.                                                     #
         #####################################################################
         # Replace "pass" statement with your code
-        pass
+        N = scores.shape[0]
+        exp = torch.exp(scores - scores.max(dim=1, keepdim=True)[0])
+        prob = exp / exp.sum(dim=1, keepdim=True)
+        loss = -torch.log(prob[torch.arange(N), y]).mean()
+        reg_loss = 0.0
+        for i in range(1, self.num_layers + 1):
+            W = self.params[f'W{i}']
+            reg_loss += 0.5 * self.reg * (W ** 2).sum()
+        loss += reg_loss
+        dscores = prob.clone()
+        dscores[torch.arange(N), y] -= 1
+        dscores /= N
+        W_last = self.params[f'W{self.num_layers}']
+        b_last = self.params[f'b{self.num_layers}']
+        grads[f'W{self.num_layers}'] = layer_out.T @ dscores + self.reg * W_last
+        grads[f'b{self.num_layers}'] = dscores.sum(dim=0)
+
+        dout = dscores @ W_last.T
+        for i in reversed(range(1, self.num_layers)):
+            if self.use_dropout:
+                _, W, b, z, mask = caches[i - 1]
+                dout *= mask 
+            else:
+                _, W, b, z = caches[i - 1]
+            dz = dout * (z > 0).float()
+            a_prev = caches[i - 1][0]
+            grads[f'W{i}'] = a_prev.T @ dz + self.reg * W
+            grads[f'b{i}'] = dz.sum(dim=0)
+            dout = dz @ W.T
         ###########################################################
         #                   END OF YOUR CODE                      #
         ###########################################################
@@ -439,7 +517,14 @@ def create_solver_instance(data_dict, dtype, device):
     #############################################################
     solver = None
     # Replace "pass" statement with your code
-    pass
+    solver = Solver(model, data_dict,
+                update_rule=sgd,
+                optim_config={'learning_rate': 2.5e-2},
+                lr_decay=0.995,
+                num_epochs=30,
+                batch_size=100,
+                print_every=100,
+                device=device)
     ##############################################################
     #                    END OF YOUR CODE                        #
     ##############################################################
@@ -454,7 +539,8 @@ def get_three_layer_network_params():
     weight_scale = 1e-2   # Experiment with this!
     learning_rate = 1e-4  # Experiment with this!
     # Replace "pass" statement with your code
-    pass
+    weight_scale = 2e-1
+    learning_rate = 1e-2
     ################################################################
     #                             END OF YOUR CODE                 #
     ################################################################
@@ -469,7 +555,7 @@ def get_five_layer_network_params():
     learning_rate = 2e-3  # Experiment with this!
     weight_scale = 1e-5   # Experiment with this!
     # Replace "pass" statement with your code
-    pass
+    weight_scale = 2e-2
     ################################################################
     #                       END OF YOUR CODE                       #
     ################################################################
@@ -513,7 +599,8 @@ def sgd_momentum(w, dw, config=None):
     # update the velocity v.                                         #
     ##################################################################
     # Replace "pass" statement with your code
-    pass
+    v = config['momentum'] * v - config['learning_rate'] * dw
+    next_w = w + v
     ###################################################################
     #                           END OF YOUR CODE                      #
     ###################################################################
@@ -547,7 +634,10 @@ def rmsprop(w, dw, config=None):
     # config['cache'].                                                        #
     ###########################################################################
     # Replace "pass" statement with your code
-    pass
+    cache = config['cache']
+    cache = config['decay_rate'] * cache + (1 - config['decay_rate']) * dw ** 2
+    next_w = w - config['learning_rate'] * dw / (torch.sqrt(cache) + config['epsilon'])
+    config['cache'] = cache
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -588,7 +678,18 @@ def adam(w, dw, config=None):
     # using it in any calculations.                                          #
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    config['t'] += 1
+    m = config['m']
+    v = config['v']
+    beta1, beta2 = config['beta1'], config['beta2']
+    lr, eps = config['learning_rate'], config['epsilon']
+    t = config['t']
+    m = beta1 * m + (1 - beta1) * dw
+    v = beta2 * v + (1 - beta2) * (dw ** 2)
+    m_corr = m / (1 - beta1 ** t)
+    v_corr = v / (1 - beta2 ** t)
+    next_w = w - lr * m_corr / (torch.sqrt(v_corr) + eps)
+    config['m'], config['v'] = m, v
     #########################################################################
     #                              END OF YOUR CODE                         #
     #########################################################################
@@ -641,7 +742,8 @@ class Dropout(object):
             # Store the dropout mask in the mask variable.               #
             ##############################################################
             # Replace "pass" statement with your code
-            pass
+            mask = (torch.rand_like(x) > p).float() / (1.0 - p)
+            out = x * mask
             ##############################################################
             #                   END OF YOUR CODE                         #
             ##############################################################
@@ -651,7 +753,8 @@ class Dropout(object):
             # inverted dropout.                                          #
             ##############################################################
             # Replace "pass" statement with your code
-            pass
+            mask = None
+            out = x
             ##############################################################
             #                      END OF YOUR CODE                      #
             ##############################################################
@@ -678,7 +781,7 @@ class Dropout(object):
             # inverted dropout                                        #
             ###########################################################
             # Replace "pass" statement with your code
-            pass
+            dx = dout * mask 
             ###########################################################
             #                     END OF YOUR CODE                    #
             ###########################################################

@@ -1,0 +1,12 @@
+# assignments (ITE4052)
+torch>=2.0
+numpy>=1.24
+matplotlib>=3.7
+jupyter>=1.0
+
+# term project — Thermal Anomaly Hunter
+ultralytics>=8.0
+opencv-python>=4.8
+pandas>=2.0
+Pillow>=10.0
+PyYAML>=6.0

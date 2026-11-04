@@ -51,9 +51,24 @@ thermal-anomaly-detection/
 | `a2/` | linear classifiers (SVM and softmax) and a two-layer network with hand-written backward pass |
 | `a3/` | fully connected and convolutional networks, including the modular layer API |
 
-Each folder carries the `ite4052` helper package the course provides (data
-loading, gradient checking, solvers). CIFAR-10 downloads on first run and is not
-committed.
+These are the **submitted versions**, with the implementations filled in and
+the notebook outputs kept — not the blank course skeletons. Each folder carries
+the `ite4052` helper package the course provides (data loading, gradient
+checking, solvers).
+
+```bash
+pip install -r requirements.txt
+jupyter notebook assignments/a1/knn.ipynb
+```
+
+The assignment notebooks were written for Colab: the setup cells still call
+`google.colab.drive.mount()` and set `GOOGLE_DRIVE_PATH_AFTER_MYDRIVE`. For a
+local run, comment those cells out and put the folder itself on `sys.path`.
+CIFAR-10 downloads on first run and is not committed.
+
+The term project additionally needs `ultralytics` (already in
+`requirements.txt`) and a `dataset/` folder beside `thermal.yaml`; the paths in
+`thermal-anomaly-detection/project.ipynb` are relative to the repository root.
 
 ## Not in this repository
 
@@ -61,7 +76,7 @@ committed.
 |---|---|
 | lecture slides (`2. Image Classification.pdf` … `9. Training Neural Networks.pdf`) | course material |
 | proposal report, mid-term deck, final deck, written report | presentation and submission material |
-| submission PDFs and `.zip` bundles | duplicates of the assignment folders |
+| submission PDFs | the graded PDF exports; the code is in `assignments/` |
 | datasets and trained weights | CIFAR-10 is downloaded; the thermal set and `*.pt` weights are not redistributed |
 
 ## Team
